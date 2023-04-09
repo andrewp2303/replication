@@ -2,20 +2,34 @@ import socket
 from _thread import *
 import re
 from termcolor import colored
+import threading
 
-class Server:
+class Server():
 
     def __init__(self, ip, port):
 
         self.ip = ip
+
         self.port = port
+
+        # A dictionary with username as key and pending messages as values.
+        self.pending_messages = {} 
+
+        # A list of account names.
+        self.accounts = []
+
+        # A dictionary with usernames as keys and connection references as values.
+        self.conn_refs = {}
+
+        # A dictionary with logged in users.
+        self.logged_in = []
 
         # Specify the address domain and read properties of the socket.
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
         # Connect to the server at the specified port and IP address.
-        server.bind((self.ip, port))
+        server.bind((self.ip, self.port))
 
         # Listen for a maximum of 100 active connections (can be adjusted).
         server.listen(100)
@@ -27,21 +41,6 @@ class Server:
             connection, address = server.accept()
             print('\nConnected to:', address[0], ':', address[1])
             start_new_thread(self.wire_protocol, (connection,))
-
-
-
-    # A dictionary with username as key and pending messages as values.
-    pending_messages = {}
-
-    # A list of account names.
-    accounts = []
-
-    # A dictionary with usernames as keys and connection references as values.
-    conn_refs = {}
-
-    # A dictionary with logged in users.
-    logged_in = []
-
 
     def create_account(self, msg_list, connection):
         """Create an account, and associate with the appropriate socket. (c|<username>)"""
@@ -197,8 +196,8 @@ class Server:
     def get_account(self, connection):
         """Get account from connection refernce by reverse searching the live_users dictionary."""
 
-        for username in conn_refs:
-            if conn_refs[username] == connection:
+        for username in self.conn_refs:
+            if self.conn_refs[username] == connection:
                 return username
         return None
 
@@ -343,29 +342,18 @@ class Server:
             connection.send(msg.encode('UTF-8'))
 
 
-def Main():
-    # Set IP address and local port.
-    ip = "localhost"
-    port = 5050
-
-    # Specify the address domain and read properties of the socket.
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
-    # Connect to the server at the specified port and IP address.
-    server.bind((ip, port))
-
-    # Listen for a maximum of 100 active connections (can be adjusted).
-    server.listen(100)
-
-    print(f"Server started, listening on port {port}.\n")
-
-    # Main loop for the server to listen to client requests.
-    while True:
-        connection, address = server.accept()
-        print('\nConnected to:', address[0], ':', address[1])
-        start_new_thread(wire_protocol, (connection,))
-
+def Main(port):
+    server = Server("localhost", port)
 
 if __name__ == '__main__':
-    Main()
+    server1 = threading.Thread(target=Main, args=(5050,))
+    server2 = threading.Thread(target=Main, args=(5051,))
+    server3 = threading.Thread(target=Main, args=(5052,))
+
+    server1.start()
+    server2.start()
+    server3.start()
+
+    server1.join()
+    server2.join()
+    server3.join()
