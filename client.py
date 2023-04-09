@@ -6,8 +6,8 @@ from termcolor import colored
 
 def Main():
     # Set IP address and local port.
-    ip = "10.250.129.194"
-    port = 50051
+    ip = "localhost"
+    port = 5050 
 
     # Create a TCP socket connection.
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
