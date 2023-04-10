@@ -8,9 +8,10 @@ import time
 class Server():
 
     def __init__(self, ip, port, stop_event):
-
+        # The IP address of the server running.
         self.ip = ip
 
+        # The port of the server running.
         self.port = port
 
         self.stop_event = stop_event
@@ -41,7 +42,7 @@ class Server():
 
         server.settimeout(1)  # Set a timeout for the accept() method
 
-        # Main loop for the server to listen to client requests.
+        # Main loop for the server to listen to client requests until timeout.
         while not self.stop_event.is_set():
             try:
                 connection, address = server.accept()
@@ -49,7 +50,8 @@ class Server():
                 start_new_thread(self.wire_protocol, (connection,))
             except socket.timeout:
                 continue
-
+        
+        # Kill the server if the timeout event is set. 
         server.close()
         print(f"Server stopped, no longer listening on port {self.port}.\n")
 
