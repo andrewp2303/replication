@@ -34,10 +34,7 @@ class Server():
         self.logged_in = []
 
         # Retrieve accounts and pending messages from the current queue.
-        try:
-            self.unpack()
-        except:
-            pass
+        self.unpack()
 
         # Specify the address domain and read properties of the socket.
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -250,12 +247,12 @@ class Server():
         if recipient_name in self.accounts:
             sender_name = self.get_account(connection)
             if recipient_name in self.logged_in:
-                msg = colored(f"\n[{sender_name}] ", "grey") + msg + "\n"
+                msg = colored(f"[{sender_name}] ", "grey") + msg
                 self.conn_refs[recipient_name].send(msg.encode('UTF-8'))
                 print(f"\nMessage sent to {recipient_name}.\n")
                 msg = colored(f"\nMessage sent to {recipient_name}.\n", "green")
             else:
-                msg = colored(f"\n[{sender_name}] ", "grey") + msg
+                msg = colored(f"[{sender_name}] ", "grey") + msg
                 if recipient_name in self.pending_messages:
                     self.pending_messages[recipient_name].append(msg)
                 else:
