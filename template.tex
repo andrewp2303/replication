@@ -37,9 +37,9 @@
 %----------------------------------------------------------------------------------------
 
 \section{Introduction}
-In this design exercise, we re-implemented the chat application from design exercise $1$ so that our system is both persistent and two-fault tolerant. Our implementation takes a modified client multicasting approach. Instead of the client establishing a single socket connection to the primary server, it establishes connections to all three servers in the architecture. Before sending requests to the server, a function iterates through all of the socket connections and picks a live socket connection to send requests to. We implemented persistence by using CSVs to store the information in our data structures from design exercises $1$. Our code can be found \href{https://github.com/andrewp2303/replication}{here}. 
+In this design exercise, we re-implemented the chat application from design exercise $1$ so that our system is both persistent and two-fault tolerant. Our implementation takes a modified client multicasting approach. Instead of the client establishing a single socket connection to the primary server, it establishes connections to all three servers in the architecture. Before sending requests to the server, we pulse all of the socket connections and pick a live socket connection to act as our "primary" server for that iteration. We only receive and display responses from this "primary" server, but we broadcast our requests to all live replicas in order to maintain a consistent snapshot across replicas. Finally, we implemented persistence by using CSVs to more permanently store the information in our data structures from design exercises $1$. Our code can be found \href{https://github.com/andrewp2303/replication}{here}. 
 
-\section{Our Approach}
+\section{Replication \& 2-Fault Tolerance}
 
 Instead of implementing a more complicated approach involving Paxos or leader election, we opted to handle the two-fault tolerance from the client side. Running the client code establishes web socket connections to all three servers in our architecture. However, communication is only done through a single web socket. 
 
@@ -60,12 +60,20 @@ Our approach has benefits and disadvantages. Here are some of the benefits:
     \item Compute usage: our approach requires just three servers to maintain two-fault tolerance. Generally, to achieve $k$ fault tolerance, you need $2k + 1$ servers. All the methods below require a minimum of $2k + 1$ servers to function and so do other methods like erasure coding. Here, to achieve $k$ fault tolerance, you just need $2$ servers. In a scenario where you are paying for compute usage by the hour, unnecessary server costs can add up to make a very expensive distributed system. 
 \end{itemize}
 
-However, our system does also have disadvantages: 
+However, our system does also have several crucial disadvantages: 
 \begin{itemize}
     \item Practicality: in a real-world scenario, it's unlikely that clients would have information about any of the replica servers to ping them. Instead, clients would likely only have information about the primary server. Given that we are implementing this design project using TCP sockets, we chose to ignore this constraint since web socket connections would have to be established between the client and the backup servers regardless. 
     \item Data loss: even with our two-fault tolerance and presistence implementations, there is the potential for data loss. If a message is sent to a server and the server crashes before it can forward the message to the recipient, the message will not be delivered. This can be solved with a simple acknowledgement system. While we could have implemented this, we learned it was okay for messages to be lost in this way for this design project with input from Varun in the walkthrough. 
     \item Performance bottlenecks: only one server handles all correspondence with clients, failing to leverage the extra power of a distributed system. 
 \end{itemize}
+
+\section{Persistence}
+
+Alongside making our system replicated as detailed in the previous section, we also made our system persistent --- when messages are queued to be sent to a given user, they are not lost even if the system goes down and comes back up. We implemented this by writing to memory on the disk, instead of our server processes' memory --- put plainly, we stored information in a CSV file as opposed to only a Python dictionary or list. We saved both the message queue (in $PORT$.csv files) and the list of available accounts (in $PORT$users.csv files), using two methods in $server.py$: save() and unpack(). The save() method writes to these CSV files and is called at a specified interval (currently set to once a second), such that we can be guaranteed to have a recent snapshot of the message queue and available accounts. On the other hand, the unpack() method is called only when initializing a server, since this is the only time that a server might be locally unaware of what is in its message queue. This method takes the CSV files and loads them back into Python data structures, allowing the servers to "remember" which messages were queued even if they crashed/shut down. 
+
+In terms of design choices here, we firstly chose CSVs because of ease of use and access --- almost everyone understands how CSVs work and how to parse them, and they are easy to store and manage. Second, we chose to save() at a specified interval as opposed to for every action in order to prevent a client from spamming messages, and then causing extreme delays as a result of the time it takes to save to a CSV. Additionally, the more intensive process of unpacking a CSV file's data into either a list or dictionary is performed infrequently --- only when a system goes down and comes back up does it need to fetch CSV data, since otherwise the CSVs will match their respective data structures.
+
+Additionally, we benefit from the broadcasting framework detailed earlier because this does not necessitate inter-replica communication. This is because all active replicas (eventually) will have the same snapshot of the message queue and accounts, since they are all receiving the same information from each client. This hinges on the assumption that crashed servers will not recover/reboot, as detailed in several Ed posts and the walkthrough for this design exercise. Of course, when forming a replicated system where each client only forms a connection with one other node, this would no longer be feasible since that node would need to update the others about
 
 \section{Comparisons With Other Approaches}
 
@@ -90,5 +98,11 @@ Our implementation can be viewed as a slightly modified version of the primary-s
     \item There are performance bottlenecks since one server handles all communication, just like with our approach. 
     \item The primary-secondary model relies on passive replication, resulting in a lag between the primary and secondary servers' states, leading to weaker consistency guarantees than consensus-based approaches like Paxos, which actively involve multiple servers in processing client requests.
 \end{itemize}
+
+\section{Testing}
+
+One other important aspect of our codebase was testing --- both in terms of unit testing and also verifying that our system was in fact two-fault tolerant. We split up tests on the basis of the 2 main goals of our specification --- persistence and two-fault tolerance. In order to test that our persistence mechanisms were in fact working as we expected them to, we created a robust unit testing file, $tests.py$, that verifies the validity of both the save() and unpack() methods in saving and then reloading to/from CSV files. We made sure to test separately for accounts and the pending message queue. 
+
+Our fault tolerance testing came through running three servers, and then exiting two of the three servers while running a client. Each exit constitutes a "fault," and since our client was still able to send and receive communication from the server after these two faults, we determined that our system did indeed fit the specification. We implemented this test at the bottom of $server.py$, and performed it by running three simultaneous processes to each simulate one server, and then forcing one closed at a given interval.
 
 \end{document}
