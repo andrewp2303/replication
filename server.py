@@ -6,6 +6,7 @@ import threading
 import time
 
 class Server():
+    """Server class for primary and replica servers."""
 
     def __init__(self, ip, port, stop_event):
         # The IP address of the server running.
@@ -356,24 +357,32 @@ class Server():
 
 
 def Main(port, stop_event):
+    """Main method to boot up servers."""
+
     server = Server("localhost", port, stop_event)
 
 if __name__ == '__main__':
+
+    # Defining stop events for servers. 
     stop_event_server1 = threading.Event()
     stop_event_server2 = threading.Event()
     stop_event_server3 = threading.Event()
-
+    
+    # Creating the server threads. 
     server1 = threading.Thread(target=Main, args=(5050, stop_event_server1))
     server2 = threading.Thread(target=Main, args=(5051, stop_event_server2))
     server3 = threading.Thread(target=Main, args=(5052, stop_event_server3))
-
+    
+    # Starting servers. 
     server1.start()
     server2.start()
     server3.start()
 
-    time.sleep(30)  # Wait for 30 seconds
-    stop_event_server1.set()  # Signal server1 to stop
+    # Sleeping for 30 seconds and then shutting down the first server.
+    time.sleep(30) 
+    stop_event_server1.set() 
     
+    # Sleeping for 30 seconds and then shutting down the next server. 
     time.sleep(30)
     stop_event_server2.set()
 
