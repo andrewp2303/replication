@@ -49,10 +49,7 @@ In the event that a server dies and the client makes a request, our method will 
 
 Since we are given a guarantee that the client will remain alive, we can simply pick the first alive server to receive messages with via a socket connection. Similarly, with sending requests to the servers, it is fine to send requests to all of the live servers so that they maintain the same state. In the event that all the servers are being rebooted, our persistence implementation will ensure that the client chat application functions properly. 
 
-We simulated server disk writes using CSV files for our persistence implementation. For each server, we maintain two output CSVs: \{port\}.csv and \{port\}Users.csv. In port \{port\}.csv, we store the pending messages queue so that each line has a recipient and message to be delivered. 
-We iterate through these lines when pickling and unpickling our data. Finally, for \{port\}Users.csv, each line is simply an account name, and we iterate through these to form a list of accounts. This implementation has persistence of both accounts and messages being sent to each account; even if a server dies, the pending messages queue (with data about the accounts the messages are being sent to) is not lost.
-
-Our approach has benefits and disadvantages. Here are some of the benefits: 
+Our overall approach for fault tolerance has its benefits and disadvantages. Here are some of the benefits: 
 \begin{itemize}
     \item Minimized data loss: with our two-fault tolerance and presistence implementations, our program handles the case where a message is sent to a server and the server crashes before it can forward the message to the recipient. Since we send the messages to all the live servers and all the live servers forward the message to the recipient, there will be inbound across multiple channels. Even if one channel fails before a message is sent, our program will handle that and receive the message.
     \item Code modifications: as detailed in the section about code modifications from design project 1, there was very little handling to be done on the server side other than abstracting the server implementation into a class. Most of the modifications can be done on the client side, which makes our implementation far less complex than doing something like leader elections. 
@@ -87,7 +84,7 @@ With Paxos, fault tolerance is achieved through consensus. In a Paxos-based syst
 
 At an implementation level, the algorithm is both hard to grasp and requires substantial modifications to the design project $1$ code since the consensus portion is brand new. Paxos is also less efficient than our approach, since it requires multiple rounds of communication between the nodes (proposers, acceptors, and learners) to reach consensus. This can lead to increased message overhead and latency, especially in large-scale distributed systems or systems with high network latency. 
 
-Additionally, Paxos requires a majority of nodes to participate in the consensus process, which can limit its scalability. As the number of nodes increases, the required quorum size also increases, leading to higher message overhead and potential bottlenecks. This can make Paxos less suitable for very large-scale distributed systems. For our implementation, however, we just need to scale with one additional server if we want an additional level of fault tolerance and change nothing else. The client will still do outbound to all live servers and pick the first live server for inbound. 
+Additionally, Paxos requires a majority of nodes to participate in the consensus process, which can limit its scalability. As the number of nodes increases, the required quorum size also increases, leading to higher message overhead and potential bottlenecks. This can make Paxos more complicated for very large-scale distributed systems. For our implementation, however, we just need to scale with one additional server if we want an additional level of fault tolerance and change nothing else. The client will still do outbound to all live servers and pick the first live server for inbound. We do note that ideally, Paxos is a better way to implement this system, since it would add stronger guarantees of persistence and also allow for servers to crash, recover, and again become part of the distributed system. 
 
 With the primary-secondary model, fault tolerance is achieved through passive replication. The primary server processes client requests and updates the secondary servers with any changes to the system state. If the primary server fails, one of the secondary servers takes over as the new primary server, ensuring that the system remains operational.
 
@@ -103,5 +100,10 @@ Our implementation is a better version than the primary-secondary model because 
 One other important aspect of our codebase was testing --- both in terms of unit testing and also verifying that our system was in fact two-fault tolerant. We split up tests on the basis of the 2 main goals of our specification --- persistence and two-fault tolerance. In order to test that our persistence mechanisms were in fact working as we expected them to, we created a robust unit testing file, $tests.py$, that verifies the validity of both the save() and unpack() methods in saving and then reloading to/from CSV files. We made sure to test separately for accounts and the pending message queue. 
 
 Our fault tolerance testing came through running three servers, and then exiting two of the three servers while running a client. Each exit constitutes a "fault," and since our client was still able to send and receive communication from the server after these two faults, we determined that our system did indeed fit the specification. We implemented this test at the bottom of $server.py$, and performed it by running three simultaneous processes to each simulate one server, and then forcing one closed at a given interval.
+
+\section{Figures}
+
+\includegraphics[width=0.5\textwidth]{system.png} \\
+The above figure provides a diagram for the socket connections / communication channels formed with our model --- note that importantly, there are no inter-server or inter-client connections and each client is connected bidirectionally to every server replica.
 
 \end{document}
