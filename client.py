@@ -15,17 +15,21 @@ def check_alive_conns(conn_list):
     return alive_conns
 
 def Main():
-    conn1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    conn1.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    conn1.connect(("localhost", 5050))
+    try:
+        HOST = sys.argv[1]
+        PORTS = [int(sys.argv[i]) for i in range(2, len(sys.argv))]
+    except:
+        print("Usage: python3 client.py <HOST> <PORT1> <PORT2> ...")
+        sys.exit(1)
+    
+    conns = []
 
-    conn2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    conn2.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    conn2.connect(("localhost", 5051))
-
-    conn3 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    conn3.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    conn3.connect(("localhost", 5052))
+    # form a connection to all of the servers on input ports
+    for PORT in PORTS:
+        conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        conn.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        conn.connect((HOST, PORT))
+        conns.append(conn)
 
     # Welcome message.
     msg = "\nWelcome to the chat application! Begin by logging in or creating an account. Below, you will find a list of supported commands :\n"
@@ -41,7 +45,7 @@ def Main():
     
     # Main loop for clients to receive and send messages to the server.
     while True:   
-        alive_conns = check_alive_conns([conn1, conn2, conn3])
+        alive_conns = check_alive_conns(conns)
         curr_conn = alive_conns[0]
 
         # List of input streams.

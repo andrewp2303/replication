@@ -1,8 +1,8 @@
-import socket
+import socket, sys, csv
 from _thread import *
 import re
 from termcolor import colored
-import threading
+import threading, multiprocessing
 import time
 
 class Server():
@@ -15,10 +15,14 @@ class Server():
         # The port of the server running.
         self.port = port
 
+        # Stores an event that can close the server (used for testing)
         self.stop_event = stop_event
 
         # A dictionary with username as key and pending messages as values.
         self.pending_messages = {} 
+
+        # How many seconds the server waits before pickling the current queue.
+        self.pickle_interval = 1
 
         # A list of account names.
         self.accounts = []
@@ -28,6 +32,12 @@ class Server():
 
         # A dictionary with logged in users.
         self.logged_in = []
+
+        # Retrieve accounts and pending messages from the current queue.
+        try:
+            self.unpickle()
+        except:
+            pass
 
         # Specify the address domain and read properties of the socket.
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -287,12 +297,50 @@ class Server():
             acc_str = colored("\nNo matching users!\n", "red")
 
         return acc_str
+    
+    def pickle(self):
+        """Pickle accounts and the message queue to csv files."""
+        port_csv = f"{self.port}.csv"
+        with open(port_csv, 'w') as f:
+            for key in self.pending_messages.keys():
+                queue = self.pending_messages[key]
+                for msg in queue:
+                    print(f"writing pending msg: {self.pending_messages[key]}")
+                    f.write(f"{key},{msg}\n")
 
+        port_users_csv = f"{self.port}users.csv"
+        with open(port_users_csv, 'w') as f:
+            for account in self.accounts:
+                f.write(f"{account}\n")
+
+    def unpickle(self):
+        """Unpickle the accounts and message queue from csv files."""
+        port_csv = f"{self.port}.csv"
+        with open(port_csv, 'r') as f:
+            for line in f:
+                key, value = line.strip().split(',')
+                if self.pending_messages.get(key):
+                    self.pending_messages[key].append(value)
+                else:
+                    self.pending_messages[key] = [value]
+        
+        port_users_csv = f"{self.port}users.csv"
+        with open(port_users_csv, 'r') as f:
+            for line in f:
+                account = line.strip()
+                self.accounts.append(account)
 
     def wire_protocol(self, connection):
         """Main server thread that continues running until the connection is closed."""
 
+        pickleTime = time.time()
         while True:
+            # Ensure persistence by pickling queue at a given interval
+            if time.time() > pickleTime + self.pickle_interval:
+                print("\nPickling queue.\n")
+                self.pickle()
+                pickleTime = time.time()
+            
             # Preprocess the message by decoding it and splitting it by delimeter.
             msg = connection.recv(4096)
             msg_str = msg.decode('UTF-8')
@@ -356,36 +404,21 @@ class Server():
             connection.send(msg.encode('UTF-8'))
 
 
-def Main(port, stop_event):
+def Main(ip, port, stop_event):
     """Main method to boot up servers."""
 
-    server = Server("localhost", port, stop_event)
+    server = Server(ip, port, stop_event)
 
 if __name__ == '__main__':
 
+    # Get the host and port from the command line arguments
+    try:
+        HOST = sys.argv[1]
+        PORT = int(sys.argv[2])
+    except:
+        print("Usage: python3 server.py <HOST> <PORT>")
+        sys.exit(1)
+
     # Defining stop events for servers. 
-    stop_event_server1 = threading.Event()
-    stop_event_server2 = threading.Event()
-    stop_event_server3 = threading.Event()
-    
-    # Creating the server threads. 
-    server1 = threading.Thread(target=Main, args=(5050, stop_event_server1))
-    server2 = threading.Thread(target=Main, args=(5051, stop_event_server2))
-    server3 = threading.Thread(target=Main, args=(5052, stop_event_server3))
-    
-    # Starting servers. 
-    server1.start()
-    server2.start()
-    server3.start()
-
-    # Sleeping for 30 seconds and then shutting down the first server.
-    time.sleep(30) 
-    stop_event_server1.set() 
-    
-    # Sleeping for 30 seconds and then shutting down the next server. 
-    time.sleep(30)
-    stop_event_server2.set()
-
-    server1.join()
-    server2.join()
-    server3.join()
+    stop_event_server = multiprocessing.Event()
+    Server(HOST, PORT, stop_event_server)

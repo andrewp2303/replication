@@ -146,5 +146,9 @@ __pycache__
 output*.txt
 *queue.txt
 *.png
+
+
 tests.txt
 sample.bib
+*.csv
+tests.py
