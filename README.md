@@ -48,13 +48,11 @@ Run this command for wired networks:
 $ ipconfig getifaddr en1
 ```
 
-Next, in server.py, replace ip = "10.250.129.194" with the IP address you obtained in the above step. Set the port number to port = 50051 (or any consistent number you want). Do the same for client.py as well. 
-
 Finally, turn off your Firewall so that your machine can accept incoming network connections. 
 
 ## How to Use
 
-First, run server.py on the machine you wnat to host your server on. Then, run client.py on all the machines you want to be clients. 
+First, run ```server.py <IP> <PORT>``` using the IP you found above, and then using a port of your choice. In order to ensure 2-fault tolerance, we must do this using 3 different ports (e.g. 3 different machines). This can also be done by running server.py with a test flag --- ```server.py test```. Finally, run ```client.py <IP> <PORT1> <PORT2> <PORT3>``` on all the machines you want to be clients, with the 3 ports representing each of the replica machines.
 
 Congratulations! You've now established a connection between your client and server. You can begin making commands by using the following usage. 
 

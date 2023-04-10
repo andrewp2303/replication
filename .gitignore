@@ -151,4 +151,4 @@ output*.txt
 tests.txt
 sample.bib
 *.csv
-tests.py
+badtests.py

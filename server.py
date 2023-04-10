@@ -35,7 +35,7 @@ class Server():
 
         # Retrieve accounts and pending messages from the current queue.
         try:
-            self.unpickle()
+            self.unpack()
         except:
             pass
 
@@ -298,14 +298,14 @@ class Server():
 
         return acc_str
     
-    def pickle(self):
-        """Pickle accounts and the message queue to csv files."""
+    def save(self):
+        """Save accounts and the message queue to csv files."""
         port_csv = f"{self.port}.csv"
         with open(port_csv, 'w') as f:
             for key in self.pending_messages.keys():
                 queue = self.pending_messages[key]
                 for msg in queue:
-                    print(f"writing pending msg: {self.pending_messages[key]}")
+                    print(f"Writing pending msg: {self.pending_messages[key]}")
                     f.write(f"{key},{msg}\n")
 
         port_users_csv = f"{self.port}users.csv"
@@ -313,8 +313,8 @@ class Server():
             for account in self.accounts:
                 f.write(f"{account}\n")
 
-    def unpickle(self):
-        """Unpickle the accounts and message queue from csv files."""
+    def unpack(self):
+        """Unpack the accounts and message queue from csv files."""
         port_csv = f"{self.port}.csv"
         with open(port_csv, 'r') as f:
             for line in f:
@@ -337,8 +337,8 @@ class Server():
         while True:
             # Ensure persistence by pickling queue at a given interval
             if time.time() > pickleTime + self.pickle_interval:
-                print("\nPickling queue.\n")
-                self.pickle()
+                print("Saving accounts and messages.\n")
+                self.save()
                 pickleTime = time.time()
             
             # Preprocess the message by decoding it and splitting it by delimeter.
@@ -403,22 +403,42 @@ class Server():
             # Send encoded acknowledgment to the connected client
             connection.send(msg.encode('UTF-8'))
 
+def test_two_fault():
+    """Test the two fault tolerance of servers by shutting 2 down."""
+    stop_event_server1 = multiprocessing.Event()
+    stop_event_server2 = multiprocessing.Event()
+    stop_event_server3 = multiprocessing.Event()
 
-def Main(ip, port, stop_event):
-    """Main method to boot up servers."""
+    # Creating the server threads. 
+    server1 = multiprocessing.Process(target=Server, args=("localhost", 5050, stop_event_server1))
+    server2 = multiprocessing.Process(target=Server, args=("localhost", 5051, stop_event_server2))
+    server3 = multiprocessing.Process(target=Server, args=("localhost", 5052, stop_event_server3))
 
-    server = Server(ip, port, stop_event)
+    # Starting servers. 
+    server1.start()
+    server2.start()
+    server3.start()
+
+    time.sleep(30)  # Wait for 30 seconds
+    stop_event_server1.set()  # Signal server1 to stop.
+
+    # Sleeping for 30 seconds and then shutting down the next server. 
+    time.sleep(30)
+    stop_event_server2.set()
 
 if __name__ == '__main__':
 
-    # Get the host and port from the command line arguments
-    try:
+    # Validate command line arguments.
+    if len(sys.argv) == 3:
         HOST = sys.argv[1]
         PORT = int(sys.argv[2])
-    except:
+        # Defining stop events for servers. 
+        stop_event_server = multiprocessing.Event()
+
+        # Start the server process.
+        Server(HOST, PORT, stop_event_server)
+    elif len(sys.argv) == 2 and sys.argv[1] == "test":
+        test_two_fault()
+    else:
         print("Usage: python3 server.py <HOST> <PORT>")
         sys.exit(1)
-
-    # Defining stop events for servers. 
-    stop_event_server = multiprocessing.Event()
-    Server(HOST, PORT, stop_event_server)
