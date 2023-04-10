@@ -3,14 +3,17 @@ from _thread import *
 import re
 from termcolor import colored
 import threading
+import time
 
 class Server():
 
-    def __init__(self, ip, port):
+    def __init__(self, ip, port, stop_event):
 
         self.ip = ip
 
         self.port = port
+
+        self.stop_event = stop_event
 
         # A dictionary with username as key and pending messages as values.
         self.pending_messages = {} 
@@ -36,11 +39,19 @@ class Server():
 
         print(f"Server started, listening on port {self.port}.\n")
 
+        server.settimeout(1)  # Set a timeout for the accept() method
+
         # Main loop for the server to listen to client requests.
-        while True:
-            connection, address = server.accept()
-            print('\nConnected to:', address[0], ':', address[1])
-            start_new_thread(self.wire_protocol, (connection,))
+        while not self.stop_event.is_set():
+            try:
+                connection, address = server.accept()
+                print('\nConnected to:', address[0], ':', address[1])
+                start_new_thread(self.wire_protocol, (connection,))
+            except socket.timeout:
+                continue
+
+        server.close()
+        print(f"Server stopped, no longer listening on port {self.port}.\n")
 
     def create_account(self, msg_list, connection):
         """Create an account, and associate with the appropriate socket. (c|<username>)"""
@@ -342,17 +353,27 @@ class Server():
             connection.send(msg.encode('UTF-8'))
 
 
-def Main(port):
-    server = Server("localhost", port)
+def Main(port, stop_event):
+    server = Server("localhost", port, stop_event)
 
 if __name__ == '__main__':
-    server1 = threading.Thread(target=Main, args=(5050,))
-    server2 = threading.Thread(target=Main, args=(5051,))
-    server3 = threading.Thread(target=Main, args=(5052,))
+    stop_event_server1 = threading.Event()
+    stop_event_server2 = threading.Event()
+    stop_event_server3 = threading.Event()
+
+    server1 = threading.Thread(target=Main, args=(5050, stop_event_server1))
+    server2 = threading.Thread(target=Main, args=(5051, stop_event_server2))
+    server3 = threading.Thread(target=Main, args=(5052, stop_event_server3))
 
     server1.start()
     server2.start()
     server3.start()
+
+    time.sleep(30)  # Wait for 30 seconds
+    stop_event_server1.set()  # Signal server1 to stop
+    
+    time.sleep(30)
+    stop_event_server2.set()
 
     server1.join()
     server2.join()
